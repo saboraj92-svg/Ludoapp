@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ludo Online Multiplayer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        :root {
+            --primary: #e94560;
+            --secondary: #f9ca24;
+            --text-light: #f8fafc;
+            --accent: #38bdf8;
+            
+            /* Colors from your provided code */
+            --color-red: #ec1d27;
+            --color-green: #01A147;
+            --color-yellow: #ffe01b;
+            --color-blue: #29b6f6;
+            --color-orange: #ff9800;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Poppins', sans-serif;
+            user-select: none;
+        }
+
+        /* Background image from your code */
+        body {
+            background-image: url(https://i.ibb.co/PN5V5YS/Capture-2021-09-29-10-31-35-01.jpg);
+            background-size: cover;
+            background-repeat: repeat;
+            background-attachment: fixed;
+            color: var(--text-light);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .screen {
+            display: none;
+            width: 100%;
+            height: 100%;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: fadeIn 0.4s ease-out;
+        }
+        .screen.active { display: flex; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .panel {
+            background: rgba(0, 0, 0, 0.85); /* Darker semi-transparent to stand out on background */
+            backdrop-filter: blur(10px);
+            border: 2px solid var(--secondary);
+            padding: 25px 20px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 360px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .input-group { width: 100%; margin-bottom: 15px; position: relative; }
+        .input-group i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+        }
+        .input-field {
+            width: 100%;
+            padding: 14px 14px 14px 40px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.5);
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+        .input-field:focus { border-color: var(--accent); box-shadow: 0 0 10px rgba(56, 189, 248, 0.3); }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .btn:active { transform: scale(0.98); }
+        
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-secondary { background: var(--accent); color: #000; }
+        .btn-success { background: #22c55e; color: white; }
+        
+        .btn-text { background: transparent; color: var(--text-light); font-weight: 400; font-size: 0.9rem; margin-top: 10px; border: none; cursor: pointer;}
+        .toggle-link { color: var(--secondary); cursor: pointer; font-weight: 600; }
+
+        /* --- LOGIN SCREEN --- */
+        .ludo-img { width: 100px; height: 100px; margin-bottom: 15px; filter: drop-shadow(0 0 15px rgba(249, 202, 36, 0.5)); }
+        .title { font-size: 2.5rem; font-weight: 800; letter-spacing: 2px; color: var(--secondary); margin-bottom: 5px; text-shadow: 2px 2px 4px #000; }
+        .subtitle { font-size: 0.9rem; color: #ddd; margin-bottom: 20px; }
+
+        /* --- MAIN MENU --- */
+        .menu-title { font-size: 1.6rem; font-weight: 700; margin-bottom: 20px; text-align: center; text-shadow: 2px 2px 4px #000;}
+
+        /* --- MODAL --- */
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 50;
+            border-radius: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: #1e293b; padding: 20px; border-radius: 12px; width: 80%; text-align: center; border: 1px solid var(--secondary);
+        }
+
+        /* --- WAITING ROOM --- */
+        .room-code-box {
+            background: rgba(0,0,0,0.5); border: 2px dashed var(--secondary);
+            padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; width: 100%;
+        }
+        .room-code { font-size: 1.8rem; font-weight: 800; letter-spacing: 5px; color: var(--secondary); }
+        .copy-btn { font-size: 0.8rem; color: var(--accent); cursor: pointer; margin-top: 5px; background: none; border: none; }
+        
+        .player-slots {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-bottom: 20px;
+        }
+        .slot {
+            background: rgba(255,255,255,0.1); border-radius: 8px; padding: 10px;
+            text-align: center; font-size: 0.8rem; font-weight: 600;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 60px; border: 1px solid rgba(255,255,255,0.2);
+        }
+        .slot.red { border-color: var(--color-red); color: var(--color-red); }
+        .slot.green { border-color: var(--color-green); color: var(--color-green); }
+        .slot.yellow { border-color: var(--color-yellow); color: var(--color-yellow); }
+        .slot.blue { border-color: var(--color-blue); color: var(--color-blue); }
+        .slot.orange { border-color: var(--color-orange); color: var(--color-orange); }
+        .slot i { font-size: 1.2rem; margin-bottom: 5px; }
+        
+        /* --- GAME HEADER --- */
+        .header {
+            width: 100%; display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 15px; background: rgba(0, 0, 0, 0.8);
+            position: absolute; top: 0; backdrop-filter: blur(5px);
+            border-bottom: 2px solid var(--secondary); z-index: 10;
+        }
+        .header-players { display: flex; gap: 8px; flex-wrap: wrap;}
+        .avatar {
+            width: 32px; height: 32px; border-radius: 50%; background: #333;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem; border: 2px solid transparent; transition: 0.3s;
+        }
+        .avatar.red { border-color: var(--color-red); } .avatar.red.active-turn { box-shadow: 0 0 10px var(--color-red); transform: scale(1.1); }
+        .avatar.green { border-color: var(--color-green); } .avatar.green.active-turn { box-shadow: 0 0 10px var(--color-green); transform: scale(1.1); }
+        .avatar.yellow { border-color: var(--color-yellow); } .avatar.yellow.active-turn { box-shadow: 0 0 10px var(--color-yellow); transform: scale(1.1); }
+        .avatar.blue { border-color: var(--color-blue); } .avatar.blue.active-turn { box-shadow: 0 0 10px var(--color-blue); transform: scale(1.1); }
+        .avatar.orange { border-color: var(--color-orange); } .avatar.orange.active-turn { box-shadow: 0 0 10px var(--color-orange); transform: scale(1.1); }
+
+        /* --- BOARD --- */
+        .board-wrapper {
+            margin-top: 70px;
+            padding: 5px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            border: 2px solid #333;
+        }
+
+        .board-container {
+            position: relative; width: 95vw; height: 95vw; max-width: 400px; max-height: 400px;
+            background: #ffffff; display: grid;
+            grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr);
+        }
+        
+        .cell { border: 0.5px solid #999; position: relative; }
+        
+        /* Colors from your code */
+        .base-red { background-color: var(--color-red); }
+        .base-green { background-color: var(--color-green); }
+        .base-yellow { background-color: var(--color-yellow); }
+        .base-blue { background-color: var(--color-blue); }
+        .base-orange { background-color: var(--color-orange); }
+        
+        .path { background: #fff; }
+        
+        /* Home paths */
+        .red-path { background: var(--color-red); }
+        .green-path { background: var(--color-green); }
+        .yellow-path { background: var(--color-yellow); }
+        .blue-path { background: var(--color-blue); }
+        .orange-path { background: var(--color-orange); }
+        
+        /* Safe spot from your code */
+        .safe {
+            background-image: url(https://i.ibb.co/cXmb7c1/star-safe.jpg);
+            background-size: cover;
+            background-repeat: no-repeat;
+        }
+        
+        .center { 
+            background: linear-gradient(135deg, var(--color-red), var(--color-green), var(--color-yellow), var(--color-blue), var(--color-orange)); 
+            border-radius: 50%; margin: 2px; 
+        }
+
+        /* Pieces */
+        .token {
+            position: absolute; width: 6vw; height: 6vw; max-width: 18px; max-height: 18px;
+            border-radius: 50%; border: 1.5px solid #000; transform: translate(-50%, -50%);
+            cursor: pointer; transition: top 0.3s, left 0.3s; z-index: 5; box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .token.red { background: radial-gradient(circle at 30% 30%, #ff6b6b, var(--color-red)); }
+        .token.green { background: radial-gradient(circle at 30% 30%, #4ade80, var(--color-green)); }
+        .token.yellow { background: radial-gradient(circle at 30% 30%, #fde047, var(--color-yellow)); }
+        .token.blue { background: radial-gradient(circle at 30% 30%, #60a5fa, var(--color-blue)); }
+        .token.orange { background: radial-gradient(circle at 30% 30%, #fdba74, var(--color-orange)); }
+        
+        .token.selectable { animation: pulse 0.8s infinite alternate; z-index: 6; cursor: pointer; border-color: #fff; }
+        @keyframes pulse {
+            from { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.8); }
+            to { box-shadow: 0 0 0 8px rgba(255, 255, 255, 0); }
+        }
+
+        /* --- CONTROLS --- */
+        .controls { margin-top: 15px; display: flex; flex-direction: column; align-items: center; z-index: 10; }
+        .dice-box {
+            width: 60px; height: 60px; background: white; border-radius: 10px;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 2.2rem; color: #000; box-shadow: 0 5px 15px rgba(0,0,0,0.6);
+            cursor: pointer; transition: 0.2s; border: 2px solid #333;
+        }
+        .dice-box:active { transform: scale(0.9); }
+        .dice-rolling { animation: roll 0.6s infinite linear; }
+        @keyframes roll {
+            0% { transform: rotate(0deg); }
+            50% { transform: rotate(180deg) scale(1.1); }
+            100% { transform: rotate(360deg); }
+        }
+        .status-text { margin-top: 10px; font-size: 1rem; font-weight: 700; color: var(--secondary); text-align: center; height: 25px; text-shadow: 1px 1px 2px #000;}
+        
+        #toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: #ef4444; color: white; padding: 10px 20px; border-radius: 8px;
+            font-size: 0.9rem; opacity: 0; transition: 0.3s; z-index: 999; pointer-events: none; font-weight: bold;
+        }
+        #toast.show { opacity: 1; top: 30px; }
+    </style>
+</head>
+<body>
+
+    <div id="toast">Error</div>
+
+    <!-- 1. AUTH SCREEN -->
+    <div id="authScreen" class="screen active">
+        <svg class="ludo-img" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="5" y="5" width="90" height="90" rx="10" fill="#1e293b" stroke="#f9ca24" stroke-width="3"/>
+            <rect x="15" y="15" width="25" height="25" rx="5" fill="#ec1d27"/>
+            <rect x="60" y="15" width="25" height="25" rx="5" fill="#ffe01b"/>
+            <rect x="15" y="60" width="25" height="25" rx="5" fill="#01A147"/>
+            <rect x="60" y="60" width="25" height="25" rx="5" fill="#29b6f6"/>
+            <circle cx="50" cy="50" r="12" fill="#ff9800" stroke="#fff" stroke-width="2"/>
+        </svg>
+        
+        <div class="title">LUDO</div>
+        <div class="subtitle" id="authSubtitle">Online Multiplayer</div>
+        
+        <div class="panel">
+            <!-- Sign In Form -->
+            <div id="signInForm" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+                <div class="input-group">
+                    <i class="fas fa-user"></i>
+                    <input type="text" id="loginUser" class="input-field" placeholder="Username">
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="loginPass" class="input-field" placeholder="Password">
+                </div>
+                <button id="signInBtn" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt"></i> Sign In
+                </button>
+                <div class="btn-text">No account? <span class="toggle-link" onclick="toggleAuth('up')">Sign Up</span></div>
+            </div>
+
+            <!-- Sign Up Form -->
+            <div id="signUpForm" style="width: 100%; display: none; flex-direction: column; align-items: center;">
+                <div class="input-group">
+                    <i class="fas fa-user"></i>
+                    <input type="text" id="signupUser" class="input-field" placeholder="Choose Username">
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="signupPass" class="input-field" placeholder="Create Password">
+                </div>
+                <button id="signUpBtn" class="btn btn-secondary">
+                    <i class="fas fa-user-plus"></i> Sign Up
+                </button>
+                <div class="btn-text">Have account? <span class="toggle-link" onclick="toggleAuth('in')">Sign In</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. MAIN MENU SCREEN -->
+    <div id="mainMenu" class="screen">
+        <div class="menu-title">Welcome, <span id="menuUserName" style="color: var(--secondary);"></span></div>
+        
+        <div class="panel">
+            <button id="createRoomBtn" class="btn btn-primary">
+                <i class="fas fa-plus-circle"></i> Create Room
+            </button>
+            
+            <div style="margin: 10px 0; color: #94a3b8; font-size: 0.8rem;">OR JOIN EXISTING</div>
+            
+            <div class="input-group">
+                <i class="fas fa-key"></i>
+                <input type="text" id="joinCodeInput" class="input-field" placeholder="Room Code" maxlength="6" style="text-transform: uppercase; text-align: center; padding-left: 15px;">
+            </div>
+            <button id="joinRoomBtn" class="btn btn-secondary">
+                <i class="fas fa-sign-in-alt"></i> Join Room
+            </button>
+            
+            <button id="logoutBtn" class="btn-text" style="margin-top: 15px;">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+
+            <!-- Room Type Modal -->
+            <div id="roomTypeModal" class="modal-overlay">
+                <div class="modal-content">
+                    <h3 style="margin-bottom: 15px;">Select Game Mode</h3>
+                    <button class="btn btn-primary" onclick="createRoom(4)">4 Players</button>
+                    <button class="btn btn-success" onclick="createRoom(5)">5 Players</button>
+                    <button class="btn-text" onclick="closeModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. WAITING ROOM SCREEN -->
+    <div id="waitingScreen" class="screen">
+        <div class="menu-title">Waiting Room</div>
+        
+        <div class="panel">
+            <div class="room-code-box">
+                <div style="font-size: 0.85rem; color: #94a3b8;">Share this code with friends</div>
+                <div class="room-code" id="displayRoomCode">------</div>
+                <button class="copy-btn" onclick="copyRoomCode()">
+                    <i class="fas fa-copy"></i> Copy Code
+                </button>
+            </div>
+
+            <div class="player-slots" id="playerSlots">
+                <!-- Slots injected by JS -->
+            </div>
+
+            <button id="startGameBtn" class="btn btn-success" style="display: none;">
+                <i class="fas fa-play"></i> Start Game
+            </button>
+
+            <button id="cancelRoomBtn" class="btn btn-text" style="color: var(--primary); margin-top: 10px;">
+                <i class="fas fa-times"></i> Leave Room
+            </button>
+        </div>
+    </div>
+
+    <!-- 4. GAME SCREEN -->
+    <div id="gameScreen" class="screen">
+        <div class="header">
+            <div class="header-players" id="headerPlayers">
+                <!-- Avatars -->
+            </div>
+            <div class="header-code" style="font-weight:bold; color:#f9ca24;">
+                Room: <span id="currentRoomCode"></span>
+            </div>
+        </div>
+
+        <div class="board-wrapper">
+            <div class="board-container" id="board"></div>
+        </div>
+
+        <div class="controls">
+            <div class="dice-box" id="diceBox">
+                <i class="fas fa-dice-one" id="diceIcon"></i>
+            </div>
+            <div class="status-text" id="statusText">Waiting...</div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBw4q5i_roAqSr9k5BqoEzx-Xy8sT9AZR0",
+            authDomain: "bklhaikya-83da4.firebaseapp.com",
+            databaseURL: "https://bklhaikya-83da4-default-rtdb.firebaseio.com",
+            projectId: "bklhaikya-83da4",
+            storageBucket: "bklhaikya-83da4.firebasestorage.app",
+            messagingSenderId: "646604160199",
+            appId: "1:646604160199:android:fe943010bf168f8e8e52e2"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // --- CONSTANTS ---
+        const ALL_COLORS = ['red', 'green', 'yellow', 'blue', 'orange'];
+        
+        const MAIN_PATH = [
+            [6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],
+            [1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[6,14],[7,14],[8,14],
+            [8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],
+            [13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0]
+        ];
+
+        const SAFE_CELLS = [0, 8, 13, 21, 26, 34, 39, 47];
+        
+        const START_INDICES = { red: 0, green: 13, yellow: 26, blue: 39, orange: 8 }; // Orange starts near Red
+        
+        const BASES = {
+            red: [[13,1],[13,2],[14,1],[14,2]], // Bottom-Left
+            green: [[1,1],[1,2],[2,1],[2,2]],    // Top-Left
+            yellow: [[1,13],[1,14],[2,13],[2,14]], // Top-Right
+            blue: [[13,13],[13,14],[14,13],[14,14]], // Bottom-Right
+            orange: [[7,1],[7,2],[8,1],[8,2]]    // Center-Left
+        };
+
+        const HOMES = {
+            red: [[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],
+            green: [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
+            yellow: [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],
+            blue: [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]],
+            orange: [[6,7],[5,7],[4,7],[3,7],[2,7],[1,7]] // Shared/Adjusted for simplicity
+        };
+
+        // --- STATE ---
+        let currentUser = null;
+        let currentRoomCode = null;
+        let myColor = null; 
+        let gameState = null;
+        let roomRef = null;
+        let isHost = false;
+        let currentRoomType = 4;
+
+        // --- UI ELEMENTS ---
+        const screens = {
+            auth: document.getElementById('authScreen'),
+            menu: document.getElementById('mainMenu'),
+            waiting: document.getElementById('waitingScreen'),
+            game: document.getElementById('gameScreen')
+        };
+
+        function showScreen(screenName) {
+            Object.values(screens).forEach(s => s.classList.remove('active'));
+            screens[screenName].classList.add('active');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // --- AUTH LOGIC ---
+        function toggleAuth(type) {
+            if(type === 'up') {
+                document.getElementById('signInForm').style.display = 'none';
+                document.getElementById('signUpForm').style.display = 'flex';
+                document.getElementById('authSubtitle').innerText = "Create Account";
+            } else {
+                document.getElementById('signUpForm').style.display = 'none';
+                document.getElementById('signInForm').style.display = 'flex';
+                document.getElementById('authSubtitle').innerText = "Online Multiplayer";
+            }
+        }
+
+        document.getElementById('signUpBtn').onclick = () => {
+            const user = document.getElementById('signupUser').value.trim().toLowerCase();
+            const pass = document.getElementById('signupPass').value;
+            
+            if(user.length < 3) return showToast("Username must be 3+ characters");
+            if(pass.length < 4) return showToast("Password must be 4+ characters");
+
+            const userRef = db.ref('users/' + user);
+            userRef.once('value').then(snapshot => {
+                if (snapshot.exists()) return showToast("Username taken!");
+                userRef.set({ username: user, password: pass }).then(() => {
+                    showToast("Account created!");
+                    toggleAuth('in');
+                    document.getElementById('loginUser').value = user;
+                });
+            });
+        };
+
+        document.getElementById('signInBtn').onclick = () => {
+            const user = document.getElementById('loginUser').value.trim().toLowerCase();
+            const pass = document.getElementById('loginPass').value;
+            if(!user || !pass) return showToast("Enter credentials");
+
+            db.ref('users/' + user).once('value').then(snapshot => {
+                if (!snapshot.exists()) return showToast("User not found!");
+                if (snapshot.val().password !== pass) return showToast("Incorrect password!");
+                
+                currentUser = { uid: user, name: user };
+                localStorage.setItem('ludo_user', user);
+                document.getElementById('menuUserName').innerText = user;
+                showScreen('menu');
+            });
+        };
+
+        window.onload = () => {
+            const savedUser = localStorage.getItem('ludo_user');
+            if (savedUser) {
+                db.ref('users/' + savedUser).once('value').then(snapshot => {
+                    if (snapshot.exists()) {
+                        currentUser = { uid: savedUser, name: savedUser };
+                        document.getElementById('menuUserName').innerText = savedUser;
+                        showScreen('menu');
+                    } else {
+                        localStorage.removeItem('ludo_user');
+                    }
+                });
+            }
+        };
+
+        document.getElementById('logoutBtn').onclick = () => {
+            if(roomRef) roomRef.off();
+            localStorage.removeItem('ludo_user');
+            currentUser = null;
+            showScreen('auth');
+        };
+
+        // --- ROOM CREATION LOGIC ---
+        document.getElementById('createRoomBtn').onclick = () => {
+            document.getElementById('roomTypeModal').classList.add('active');
+        };
+
+        function closeModal() {
+            document.getElementById('roomTypeModal').classList.remove('active');
+        }
+
+        window.createRoom = (type) => {
+            closeModal();
+            currentRoomType = type;
+            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+            currentRoomCode = code;
+            myColor = 'red';
+            isHost = true;
+            
+            const initialPlayers = { red: currentUser };
+            const initialTokens = { red: [-1,-1,-1,-1] };
+            
+            ALL_COLORS.forEach(c => {
+                if(c !== 'red' && (type === 5 || c !== 'orange')) {
+                    initialPlayers[c] = null;
+                    initialTokens[c] = [-1,-1,-1,-1];
+                }
+            });
+
+            roomRef = db.ref('rooms/' + code);
+            roomRef.set({
+                roomType: type,
+                players: initialPlayers,
+                gameStarted: false,
+                turn: 'red',
+                dice: 0,
+                tokens: initialTokens
+            }).then(() => {
+                document.getElementById('displayRoomCode').innerText = code;
+                showScreen('waiting');
+                setupWaitingRoom();
+                listenToLobby();
+            });
+        };
+
+        document.getElementById('joinRoomBtn').onclick = () => {
+            const code = document.getElementById('joinCodeInput').value.toUpperCase().trim();
+            if(code.length !== 6) return showToast("Enter valid 6-digit code");
+            
+            const ref = db.ref('rooms/' + code);
+            ref.once('value').then(snapshot => {
+                const data = snapshot.val();
+                if(!data) return showToast("Room not found!");
+                if(data.gameStarted) return showToast("Game already started!");
+                
+                let joinColor = null;
+                for (let c of ALL_COLORS) {
+                    if (data.players[c] === null) {
+                        joinColor = c;
+                        break;
+                    }
+                }
+                if(!joinColor) return showToast("Room is full!");
+
+                currentRoomCode = code;
+                myColor = joinColor;
+                isHost = false;
+                currentRoomType = data.roomType;
+                
+                ref.child('players/' + myColor).set(currentUser).then(() => {
+                    roomRef = ref;
+                    document.getElementById('displayRoomCode').innerText = code;
+                    showScreen('waiting');
+                    setupWaitingRoom();
+                    listenToLobby();
+                });
+            });
+        };
+
+        document.getElementById('cancelRoomBtn').onclick = () => {
+            if(isHost && roomRef) {
+                roomRef.remove();
+            } else if(roomRef) {
+                roomRef.child('players/' + myColor).remove();
+            }
+            roomRef = null;
+            showScreen('menu');
+        };
+
+        // --- WAITING ROOM ---
+        function setupWaitingRoom() {
+            const container = document.getElementById('playerSlots');
+            container.innerHTML = '';
+            
+            ALL_COLORS.forEach(color => {
+                if(currentRoomType === 4 && color === 'orange') return;
+
+                const div = document.createElement('div');
+                div.className = `slot ${color}`;
+                div.id = `slot-${color}`;
+                div.innerHTML = `<i class="fas fa-user"></i> Empty`;
+                container.appendChild(div);
+            });
+        }
+
+        function listenToLobby() {
+            roomRef.on('value', snapshot => {
+                const data = snapshot.val();
+                if(!data) return;
+
+                let activeCount = 0;
+                ALL_COLORS.forEach(color => {
+                    if(currentRoomType === 4 && color === 'orange') return;
+                    
+                    const slot = document.getElementById('slot-' + color);
+                    if(!slot) return;
+
+                    const p = data.players[color];
+                    if(p) {
+                        activeCount++;
+                        slot.innerHTML = `<i class="fas fa-user-circle"></i> ${p.name}`;
+                        slot.style.opacity = '1';
+                    } else {
+                        slot.innerHTML = `<i class="fas fa-user"></i> Empty`;
+                        slot.style.opacity = '0.5';
+                    }
+                });
+
+                const startBtn = document.getElementById('startGameBtn');
+                if(isHost) {
+                    if(activeCount >= 2 && !data.gameStarted) {
+                        startBtn.style.display = 'flex';
+                        startBtn.innerText = `Start Game (${activeCount} Players)`;
+                    } else {
+                        startBtn.style.display = 'none';
+                    }
+                }
+
+                if(data.gameStarted && !screens.game.classList.contains('active')) {
+                    roomRef.off('value');
+                    showScreen('game');
+                    document.getElementById('currentRoomCode').innerText = currentRoomCode;
+                    initBoardUI(data.roomType);
+                    listenToGame();
+                }
+            });
+        }
+
+        document.getElementById('startGameBtn').onclick = () => {
+            roomRef.update({ gameStarted: true });
+        };
+
+        // --- GAME ENGINE ---
+        function listenToGame() {
+            roomRef.on('value', snapshot => {
+                gameState = snapshot.val();
+                if(!gameState) return;
+                updateUI();
+            });
+        }
+
+        function rollDice() {
+            if(!gameState || gameState.turn !== myColor) return;
+            if(gameState.dice !== 0 || gameState.winner) return;
+
+            document.getElementById('diceBox').classList.add('dice-rolling');
+            
+            setTimeout(() => {
+                const val = Math.floor(Math.random() * 6) + 1;
+                document.getElementById('diceBox').classList.remove('dice-rolling');
+                roomRef.child('dice').set(val);
+                
+                if(!hasValidMove(myColor, val)) {
+                    document.getElementById('statusText').innerText = "No valid moves. Passing...";
+                    setTimeout(() => passTurn(), 1500);
+                }
+            }, 800);
+        }
+        document.getElementById('diceBox').onclick = rollDice;
+
+        function hasValidMove(color, dice) {
+            const tokens = gameState.tokens[color];
+            for(let i=0; i<4; i++) {
+                if(tokens[i] === 57) continue;
+                if(tokens[i] === -1 && dice === 6) return true;
+                if(tokens[i] !== -1 && tokens[i] + dice <= 57) return true;
+            }
+            return false;
+        }
+
+        function moveToken(color, tokenIndex) {
+            if(gameState.turn !== myColor || gameState.turn !== color) return;
+            if(gameState.dice === 0) return;
+
+            const dice = gameState.dice;
+            let currentPos = gameState.tokens[color][tokenIndex];
+            
+            if(currentPos === -1 && dice !== 6) return;
+            if(currentPos !== -1 && currentPos + dice > 57) return;
+
+            let newPos = currentPos === -1 ? 0 : currentPos + dice;
+            roomRef.child(`tokens/${color}/${tokenIndex}`).set(newPos);
+            
+            if(newPos >= 0 && newPos <= 51) {
+                checkCapture(color, newPos);
+            }
+
+            if(gameState.tokens[color].filter((p, i) => i === tokenIndex ? newPos : p === 57).length === 4) {
+                roomRef.child('winner').set(color);
+                return;
+            }
+
+            if(dice === 6 || newPos === 57) {
+                roomRef.child('dice').set(0);
+            } else {
+                passTurn();
+            }
+        }
+
+        function checkCapture(myColor, myPos) {
+            const myStart = START_INDICES[myColor];
+            const finalPos = (myStart + myPos) % 52;
+            if(SAFE_CELLS.includes(finalPos)) return;
+
+            ALL_COLORS.forEach(enemyColor => {
+                if(enemyColor === myColor || !gameState.players[enemyColor]) return;
+                const enemyStart = START_INDICES[enemyColor];
+                const enemyTokens = gameState.tokens[enemyColor];
+
+                for(let i=0; i<4; i++) {
+                    if(enemyTokens[i] >= 0 && enemyTokens[i] <= 51) {
+                        if((enemyStart + enemyTokens[i]) % 52 === finalPos) {
+                            roomRef.child(`tokens/${enemyColor}/${i}`).set(-1);
+                        }
+                    }
+                }
+            });
+        }
+
+        function passTurn() {
+            let currentIndex = ALL_COLORS.indexOf(gameState.turn);
+            let nextTurn = null;
+            for(let i=1; i<=5; i++) {
+                let nextIndex = (currentIndex + i) % 5;
+                let color = ALL_COLORS[nextIndex];
+                if(gameState.players[color]) {
+                    nextTurn = color;
+                    break;
+                }
+            }
+            roomRef.update({ turn: nextTurn, dice: 0 });
+        }
+
+        // --- UI RENDERING ---
+        function initBoardUI(roomType) {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            
+            for(let r=0; r<15; r++) {
+                for(let c=0; c<15; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.id = `cell-${r}-${c}`;
+                    
+                    // Bases mapping
+                    if(r<6 && c<6) cell.classList.add('base-green');
+                    else if(r<6 && c>8) cell.classList.add('base-yellow');
+                    else if(r>8 && c>8) cell.classList.add('base-blue');
+                    else if(r>8 && c<6) cell.classList.add('base-red');
+                    else if(roomType === 5 && r>5 && r<9 && c<5) cell.classList.add('base-orange'); 
+                    
+                    // Homes
+                    if(r===7 && c>0 && c<7) cell.classList.add('red-path');
+                    else if(c===7 && r>0 && r<7) cell.classList.add('green-path');
+                    else if(r===7 && c>7 && c<14) cell.classList.add('yellow-path');
+                    else if(c===7 && r>7 && r<14) cell.classList.add('blue-path');
+                    else if(roomType === 5 && c===7 && r>7 && r<14) cell.classList.add('orange-path'); // Fallback
+                    
+                    if(r===7 && c===7) cell.classList.add('center');
+
+                    board.appendChild(cell);
+                }
+            }
+
+            MAIN_PATH.forEach((pos, i) => {
+                const cell = document.getElementById(`cell-${pos[0]}-${pos[1]}`);
+                if(cell) {
+                    cell.classList.add('path');
+                    if(SAFE_CELLS.includes(i)) cell.classList.add('safe');
+                }
+            });
+        }
+
+        function updateUI() {
+            if(!gameState) return;
+
+            const header = document.getElementById('headerPlayers');
+            header.innerHTML = '';
+            ALL_COLORS.forEach(color => {
+                if(gameState.players[color]) {
+                    const isTurn = gameState.turn === color;
+                    header.innerHTML += `<div class="avatar ${color} ${isTurn ? 'active-turn' : ''}" title="${gameState.players[color].name}"><i class="fas fa-user"></i></div>`;
+                }
+            });
+
+            if(gameState.winner) {
+                document.getElementById('statusText').innerText = `${gameState.winner.toUpperCase()} WON!`;
+                return;
+            }
+            
+            document.getElementById('statusText').innerText = gameState.turn === myColor ? "Your Turn!" : `${gameState.turn.toUpperCase()}'s Turn...`;
+
+            const diceIcons = ['', 'fa-dice-one', 'fa-dice-two', 'fa-dice-three', 'fa-dice-four', 'fa-dice-five', 'fa-dice-six'];
+            document.getElementById('diceIcon').className = gameState.dice > 0 ? `fas ${diceIcons[gameState.dice]}` : `fas fa-dice`;
+
+            renderTokens();
+        }
+
+        function renderTokens() {
+            document.querySelectorAll('.token').forEach(t => t.remove());
+
+            ALL_COLORS.forEach(color => {
+                if(!gameState.players[color]) return;
+
+                gameState.tokens[color].forEach((pos, i) => {
+                    let r, c;
+                    if(pos === -1) {
+                        [r, c] = BASES[color][i];
+                    } 
+                    else if(pos >= 0 && pos <= 51) {
+                        const absPos = (START_INDICES[color] + pos) % 52;
+                        [r, c] = MAIN_PATH[absPos];
+                    } 
+                    else if(pos >= 52 && pos <= 57) {
+                        if(pos === 57) {
+                            r = 7 + (i===0 ? -0.2 : i===2 ? 0.2 : 0); 
+                            c = 7 + (i===1 ? -0.2 : i===3 ? 0.2 : 0);
+                        } else {
+                            [r, c] = HOMES[color][pos - 52];
+                        }
+                    }
+
+                    const tokenEl = document.createElement('div');
+                    tokenEl.className = `token ${color}`;
+                    tokenEl.style.top = `${((r + 0.5) / 15) * 100}%`;
+                    tokenEl.style.left = `${((c + 0.5) / 15) * 100}%`;
+
+                    if(gameState.turn === myColor && color === myColor && gameState.dice > 0) {
+                        if((pos === -1 && gameState.dice === 6) || (pos !== -1 && pos !== 57 && pos + gameState.dice <= 57)) {
+                            tokenEl.classList.add('selectable');
+                            tokenEl.onclick = () => moveToken(color, i);
+                        }
+                    }
+                    document.getElementById('board').appendChild(tokenEl);
+                });
+            });
+        }
+
+        function copyRoomCode() {
+            const code = document.getElementById('displayRoomCode').innerText;
+            navigator.clipboard.writeText(code).then(() => showToast("Code copied!"));
+        }
+    </script>
+</body>
+</html>
